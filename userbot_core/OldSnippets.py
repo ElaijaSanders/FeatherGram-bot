@@ -21,6 +21,14 @@ def message_json(_, msg):
 app.send_message('me', f'<a href="tg://user?id={msg.reply_to_message.from_user.id}">permalink</a>')
 	print(app.get_users("me"))
 
+print(
+    f"Device Name: {system_info.node}\n"
+    f"System: {system_info.system}\n"
+    f"Release: {system_info.release}\n"
+    f"Version: {system_info.version}\n"
+    f"Architect: {system_info.machine}\n"
+    f"Processor: {system_info.processor}"
+)
 
 @app.on_message(filters.command('all_chats', prefixes='.') & filters.me)
 def send_chats(_, msg):
