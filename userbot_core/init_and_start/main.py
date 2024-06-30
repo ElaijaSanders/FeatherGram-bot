@@ -2,7 +2,7 @@ from pyrogram import *
 from pyrogram import types
 import re
 from time import sleep
-from userbot_core.CustomSend import CSend
+from userbot_core.CustomSend import safe_send, send_big_text, safe_edit
 from userbot_core.init_and_start.init import app
 import platform
 import subprocess
@@ -217,7 +217,7 @@ def a(_, msg: types.Message):
     for index in range(len(counter)):
         final_text = final_text + f"{index+1})  " + str(counter[index][1][0]) + f" :  {counter[index][1][1]}\n"
 
-    CSend.safe_edit(msg.chat.id, msg.id, final_text)
+    safe_edit(msg.chat.id, msg.id, final_text)
 
 
 app.run()
