@@ -1,0 +1,9 @@
+# pycharm and venv files
+.idea/
+__pycache__/
+venv/
+
+# session file
+/userbot_core/init_and_start/FeatherGram-bot.session
+# origin init file, that contains init information
+/userbot_core/init_and_start/init.py
