@@ -2,7 +2,7 @@ from pyrogram import *
 from pyrogram import types
 import re
 from time import sleep
-from userbot_core.CustomSend import safe_send, send_big_text, safe_edit
+from userbot_core.CustomSend import safe_send, send_big_text, safe_edit, split
 from userbot_core.init_and_start.init import app
 import platform
 import subprocess
@@ -162,7 +162,7 @@ def json(_, msg: types.Message):
     filters.user("me")
 )
 def a(_, msg: types.Message):
-    CSend.safe_edit(msg.chat.id, msg.id, "🟡 Начинаем подсчёт сообщений...")
+    safe_edit(msg.chat.id, msg.id, "🟡 Начинаем подсчёт сообщений...")
     sleep(0.5)
     counter = {}
     for person in app.get_chat_members(msg.chat.id):
@@ -190,7 +190,7 @@ def a(_, msg: types.Message):
                 f"🌀Считаем сообщения...\n\n" \
                 f"{have_processed}/{max_id}  ({new_progress}%)\n" \
                 "[ " + "█ "*(simply_progress//10)+"▄ "*((simply_progress % 10)//5) + "░ "*((100-simply_progress)//10)+"]"
-            CSend.safe_edit(msg.chat.id, msg.id, text_to_show)
+            safe_edit(msg.chat.id, msg.id, text_to_show)
             old_progress = new_progress
 
         try:
@@ -222,33 +222,6 @@ def a(_, msg: types.Message):
 
 app.run()
 
-
-'''with app:
-    tbs = [
-
-    ]
-    for i in tbs:
-        CSend.safe_send("me", i)
-        print(i)'''
-
-'''while True:
-    with app:
-        sleep(random.randint(3, 10))
-        app.send_chat_action(1160684599, enums.ChatAction.UPLOAD_DOCUMENT)
-        sleep(random.randint(3, 20))
-        app.send_chat_action(1160684599, enums.ChatAction.CANCEL)'''
-
-'''with app:
-    mess = list(app.get_chat_history("me", 150))
-    mess.reverse()
-    for i in mess:
-        print('[' + i.from_user.first_name + ' , ' + str(i.date) + ' , id=' + str(i.id) + ']')
-        if i.reply_to_message:
-            print("[Reply to: "+((str(i.reply_to_message.text) or str(i.reply_to_message.caption))[:15])+"...]")
-        if i.text or i.caption:
-            print(i.text or i.caption)
-        else:
-            print("unsupported media!")'''
 
 '''
 @app.on_disconnect()
