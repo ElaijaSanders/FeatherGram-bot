@@ -20,23 +20,29 @@ WORD_SEPARATORS = (" ", "\n", "\r", ".", ",", "!", "?", ">", "/", "\\", "'", "\"
 
 def split(big_text: str, split_mode: str = "auto") -> list[str]:
     """
-    :param big_text: the text that needs to be split into parts
-    :param split_mode: the mode of splitting the text; must be one of the values in SPLIT_MODES
-    :return: a list of string parts of the original text obtained by splitting big_text using the method,
-    defined in split_mode
-
     Splits the text provided in big_text into parts of CHARACTERS_LIMIT or fewer characters,
-    using the splitting method specified in split_mode:
+    using the splitting method specified in split_mode.
+
+    :param big_text:
+        the text that needs to be split into parts
+    :param split_mode:
+        the mode of splitting the text;
+        must be one of the values in ("exact_limit", "eol", "word_sep", "auto")
+    :return:
+        a list of strings - parts of the original text obtained by
+        splitting big_text using the method, specified in split_mode
+
+    All possible values of split_mode:
     * "exact_limit" - splits into parts of exactly CHARACTERS_LIMIT characters;
     * "eol" - searches to the left of the assumed boundary at CHARACTERS_LIMIT for the nearest newline character '\n',
-      and splits at that point;
+        and splits at that point;
     * "word_sep" - searches to the left of the assumed boundary at CHARACTERS_LIMIT for
-      the nearest word-separating character (one of the characters in WORD_SEPARATORS), and splits at that point;
+        the nearest word-separating character (one of the characters in WORD_SEPARATORS), and splits at that point;
     * "auto" - searches within the nearest AUTO_SPLIT_MAX_CHARACTERS characters to the left of the assumed boundary at
-      CHARACTERS_LIMIT for the nearest word-separating character (one of the characters in WORD_SEPARATORS)
-      or the nearest newline character and splits at that point,
-      and if neither a newline nor a word separator is found within the nearest AUTO_SPLIT_MAX_CHARACTERS characters,
-      splits that part as "exact_limit".
+        CHARACTERS_LIMIT for the nearest word-separating character (one of the characters in WORD_SEPARATORS)
+        or the nearest newline character and splits at that point,
+        and if neither a newline nor a word separator is found within the nearest AUTO_SPLIT_MAX_CHARACTERS characters,
+        splits that part as "exact_limit".
     """
     if split_mode not in SPLIT_MODES:  # check for incorrect split_mode value
         raise ValueError("split_mode must be one of the values in SPLIT_MODES!")
@@ -75,7 +81,7 @@ def split(big_text: str, split_mode: str = "auto") -> list[str]:
     return parts
 
 
-def safe_send(
+'''def safe_send(
         chat_id: Union[int, str],
         text: str,
         parse_mode: Optional["enums.ParseMode"] = None,
@@ -121,10 +127,10 @@ def safe_send(
             reply_markup
         )
     finally:
-        return result
+        return result'''
 
 
-def send_big_text(
+def safe_send(
         chat_id: Union[int, str],
         text: str,
         split_mode: Optional[str] = "auto",
@@ -142,23 +148,76 @@ def send_big_text(
             "types.ForceReply"
         ] = None
 ):
+    """
+    Send text messages of any length by splitting them into blocks of 4096 characters, handles FloodWait errors.
+
+    :param chat_id:
+        Unique identifier (int) or username (str) of the target chat.
+        For your personal cloud (Saved Messages) you can simply use "me" or "self".
+        For a contact that exists in your Telegram address book you can use his phone number (str)
+    :param text:
+        Text of the message to be sent
+    :param split_mode:
+        the mode of splitting the text;
+        must be one of the values in ("exact_limit", "eol", "word_sep", "auto")
+    :param parse_mode:
+        By default, texts are parsed using both Markdown and HTML styles.
+        You can combine both syntaxes together
+    :param entities:
+        List of special entities that appear in message text, which can be specified instead of *parse_mode*
+    :param disable_web_page_preview:
+        Disables link previews for links in this message
+    :param disable_notification:
+        Sends the message silently.
+        Users will receive a notification with no sound
+    :param reply_to_message_id:
+        If the message is a reply, ID of the original message
+    :param schedule_date:
+        Date when the message will be automatically sent
+    :param protect_content:
+        Protects the contents of the sent message from forwarding and saving
+    :param reply_markup:
+        Additional interface options. An object for an inline keyboard, custom reply keyboard,
+        instructions to remove reply keyboard or to force a reply from the user.
+    :return:
+        On success, the list of all sent text messages is returned.
+    """
     parts = split(text, split_mode)
     result_messages = []
-    for part in parts:
-        result = safe_send(
-            chat_id,
-            part,
-            parse_mode,
-            entities,
-            disable_web_page_preview,
-            disable_notification,
-            reply_to_message_id,
-            schedule_date,
-            protect_content,
-            reply_markup
-        )
-        if result:
-            result_messages.append(result)
+    for index, part in enumerate(parts):
+        result = None
+        try:
+            result = app.send_message(
+                chat_id,
+                part,
+                parse_mode,
+                entities,
+                disable_web_page_preview,
+                disable_notification,
+                reply_to_message_id if index == 0 else result_messages[0].id,
+                schedule_date,
+                protect_content,
+                reply_markup
+            )
+        except FloodWait as FW:
+            asyncio.sleep(FW.value)
+            result = app.send_message(
+                chat_id,
+                text,
+                parse_mode,
+                entities,
+                disable_web_page_preview,
+                disable_notification,
+                reply_to_message_id if index == 0 else result_messages[0].id,
+                schedule_date,
+                protect_content,
+                reply_markup
+            )
+        except BaseException as e:
+            print(e)
+        finally:
+            if result:
+                result_messages.append(result)
     return result_messages
 
 
