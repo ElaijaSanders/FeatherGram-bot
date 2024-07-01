@@ -81,55 +81,6 @@ def split(big_text: str, split_mode: str = "auto") -> list[str]:
     return parts
 
 
-'''def safe_send(
-        chat_id: Union[int, str],
-        text: str,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        entities: List["types.MessageEntity"] = None,
-        disable_web_page_preview: bool = None,
-        disable_notification: bool = None,
-        reply_to_message_id: int = None,
-        schedule_date: datetime = None,
-        protect_content: bool = None,
-        reply_markup: Union[
-            "types.InlineKeyboardMarkup",
-            "types.ReplyKeyboardMarkup",
-            "types.ReplyKeyboardRemove",
-            "types.ForceReply"
-        ] = None
-):
-    result = None
-    try:
-        result = app.send_message(
-            chat_id,
-            text,
-            parse_mode,
-            entities,
-            disable_web_page_preview,
-            disable_notification,
-            reply_to_message_id,
-            schedule_date,
-            protect_content,
-            reply_markup
-        )
-    except FloodWait as FW:
-        asyncio.sleep(FW.value)
-        result = app.send_message(
-            chat_id,
-            text,
-            parse_mode,
-            entities,
-            disable_web_page_preview,
-            disable_notification,
-            reply_to_message_id,
-            schedule_date,
-            protect_content,
-            reply_markup
-        )
-    finally:
-        return result'''
-
-
 def safe_send(
         chat_id: Union[int, str],
         text: str,
@@ -252,6 +203,5 @@ def safe_edit(
             disable_web_page_preview,
             reply_markup
         )
-
     finally:
         return result
