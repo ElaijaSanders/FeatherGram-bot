@@ -2,7 +2,7 @@ from pyrogram import *
 from pyrogram import types
 import re
 from time import sleep
-from userbot_core.CustomSend import safe_send, send_big_text, safe_edit, split
+from userbot_core.CustomSend import safe_send, safe_edit
 from userbot_core.init_and_start.init import app
 import platform
 import subprocess
