@@ -236,7 +236,7 @@ def test_edit(_, message: types.Message):
     result = safe_edit(
         message.chat.id,
         message.reply_to_message_id,
-        "editing test"
+        45*"a"
     )
     print(result)
 

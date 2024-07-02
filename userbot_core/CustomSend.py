@@ -6,8 +6,8 @@ from typing import Union, List, Optional
 import asyncio
 from datetime import datetime
 
-CHARACTERS_LIMIT = 4096  # max number of characters in one message
-AUTO_SPLIT_MAX_CHARACTERS = 150  # max number of characters searched through in split.auto mode
+CHARACTERS_LIMIT = 10  # max number of characters in one message
+AUTO_SPLIT_MAX_CHARACTERS = 10  # max number of characters searched through in split.auto mode
 SPLIT_MODES = (  # all possible values of split_mode parameter
     "exact_limit",  # Split into parts of exactly CHARACTERS_LIMIT characters
     "eol",  # Split at the nearest newline character to the limit
@@ -24,12 +24,12 @@ def split(big_text: str, split_mode: str = "auto") -> list[str]:
     using the splitting method specified in split_mode.
 
     :param big_text:
-        the text that needs to be split into parts
+        The text that needs to be split into parts
     :param split_mode:
-        the mode of splitting the text;
+        The mode of splitting the text;
         must be one of the values in ("exact_limit", "eol", "word_sep", "auto")
     :return:
-        a list of strings - parts of the original text obtained by
+        A list of strings - parts of the original text obtained by
         splitting big_text using the method, specified in split_mode
 
     All possible values of split_mode:
@@ -47,7 +47,7 @@ def split(big_text: str, split_mode: str = "auto") -> list[str]:
     if split_mode not in SPLIT_MODES:  # check for incorrect split_mode value
         raise ValueError("split_mode must be one of the values in SPLIT_MODES!")
     if big_text == "":
-        raise ValueError("Can't send empty message!")
+        raise ValueError("Message text can't be empty!")
     parts = []
     if split_mode == "exact_limit":
         # dividing into parts of exactly CHARACTERS_LIMIT characters
@@ -100,7 +100,8 @@ def safe_send(
         ] = None
 ):
     """
-    Send text messages of any length by splitting them into blocks of 4096 characters, handles FloodWait errors.
+    Send text messages of any length by splitting them into blocks of CHARACTERS_LIMIT characters,
+    handle FloodWait errors.
 
     :param chat_id:
         Unique identifier (int) or username (str) of the target chat.
@@ -109,7 +110,7 @@ def safe_send(
     :param text:
         Text of the message to be sent
     :param split_mode:
-        the mode of splitting the text;
+        The mode of splitting the text;
         must be one of the values in ("exact_limit", "eol", "word_sep", "auto")
     :param parse_mode:
         By default, texts are parsed using both Markdown and HTML styles.
@@ -176,11 +177,102 @@ def safe_edit(
         chat_id: Union[int, str],
         message_id: int,
         text: str,
+        split_mode: Optional[str] = "auto",
         parse_mode: Optional["enums.ParseMode"] = None,
         entities: List["types.MessageEntity"] = None,
         disable_web_page_preview: bool = None,
         reply_markup: "types.InlineKeyboardMarkup" = None
 ):
+    """
+    Edit the message to text of any length by sending additional parts in separate messages.
+    If editing is not possible, send all parts as new messages. Handle FloodWait errors.
+
+    :param chat_id:
+        Unique identifier (int) or username (str) of the target chat.
+        For your personal cloud (Saved Messages) you can simply use "me" or "self".
+        For a contact that exists in your Telegram address book you can use his phone number (str)
+    :param message_id:
+        Message identifier in the chat specified in chat_id.
+    :param text:
+        New text of the message. If bigger than CHARACTERS_LIMIT, additional parts will be sent in separate messages.
+    :param split_mode:
+        The mode of splitting the text;
+        must be one of the values in ("exact_limit", "eol", "word_sep", "auto")
+    :param parse_mode:
+        By default, texts are parsed using both Markdown and HTML styles.
+        You can combine both syntaxes together
+    :param entities:
+        List of special entities that appear in message text, which can be specified instead of *parse_mode*
+    :param disable_web_page_preview:
+        Disables link previews for links in this message
+    :param reply_markup:
+        Additional interface options. An object for an inline keyboard, custom reply keyboard,
+        instructions to remove reply keyboard or to force a reply from the user.
+    :return:
+        On success, the list of edited message and all sent text messages is returned.
+    """
+    parts = split(text, split_mode)
+    result_messages = []
+    first_result = None
+    try:
+        first_result = app.edit_message_text(
+            chat_id,
+            message_id,
+            parts[0],
+            parse_mode,
+            entities,
+            disable_web_page_preview,
+            reply_markup
+        )
+    except FloodWait as FW:
+        asyncio.sleep(FW.value)
+        first_result = app.edit_message_text(
+            chat_id,
+            message_id,
+            parts[0],
+            parse_mode,
+            entities,
+            disable_web_page_preview,
+            reply_markup
+        )
+    except BaseException as e:
+        print(e)
+    finally:
+        if first_result is None:
+            first_result = safe_send(
+                chat_id,
+                parts[0],
+                split_mode="auto",
+                parse_mode=parse_mode,
+                entities=entities,
+                disable_web_page_preview=disable_web_page_preview,
+                disable_notification=True,
+                reply_to_message_id=message_id,
+                schedule_date=None,
+                protect_content=None,
+                reply_markup=reply_markup
+            )[0]
+        result_messages.append(first_result)
+        parts.pop(0)
+        for part in parts:
+            result = safe_send(
+                chat_id,
+                part,
+                split_mode="auto",
+                parse_mode=parse_mode,
+                entities=entities,
+                disable_web_page_preview=disable_web_page_preview,
+                disable_notification=True,
+                reply_to_message_id=first_result.id,
+                schedule_date=None,
+                protect_content=None,
+                reply_markup=reply_markup
+            )[0]
+            result_messages.append(result)
+        return result_messages
+
+
+"""
     result = None
     try:
         result = app.edit_message_text(
@@ -205,3 +297,4 @@ def safe_edit(
         )
     finally:
         return result
+"""

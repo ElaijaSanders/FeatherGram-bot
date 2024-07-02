@@ -4,6 +4,7 @@ __pycache__/
 venv/
 
 # session file
-/userbot_core/init_and_start/FeatherGram-bot.session
+/**/*.session
+/**/*.session-journal
 # origin init file, that contains init information
 /userbot_core/init_and_start/init.py
