@@ -1,13 +1,15 @@
 from userbot_core.init_and_start.init import app
-from pyrogram.errors import FloodWait
+from pyrogram.errors import Flood
 from pyrogram import enums, types
 from typing import Union, List, Optional
 
 import asyncio
 from datetime import datetime
 
-CHARACTERS_LIMIT = 10  # max number of characters in one message
-AUTO_SPLIT_MAX_CHARACTERS = 10  # max number of characters searched through in split.auto mode
+CHARACTERS_LIMIT = 20  # max number of characters in one message
+AUTO_SPLIT_MAX_CHARACTERS = 5  # max number of characters searched through in split.auto mode
+with app:
+    MEDIA_CAPTION_LENGTH = 10 if app.get_users("me").is_premium else 5
 SPLIT_MODES = (  # all possible values of split_mode parameter
     "exact_limit",  # Split into parts of exactly CHARACTERS_LIMIT characters
     "eol",  # Split at the nearest newline character to the limit
@@ -18,7 +20,12 @@ SPLIT_MODES = (  # all possible values of split_mode parameter
 WORD_SEPARATORS = (" ", "\n", "\r", ".", ",", "!", "?", ">", "/", "\\", "'", "\"", "]", ")", "}")
 
 
-def split(big_text: str, split_mode: str = "auto") -> list[str]:
+def split(
+        big_text: str,
+        split_mode: str = "auto",
+        unique_first_part: bool = False,
+        custom_first_part_length: int = MEDIA_CAPTION_LENGTH
+) -> list[str]:
     """
     Splits the text provided in big_text into parts of CHARACTERS_LIMIT or fewer characters,
     using the splitting method specified in split_mode.
@@ -28,13 +35,18 @@ def split(big_text: str, split_mode: str = "auto") -> list[str]:
     :param split_mode:
         The mode of splitting the text;
         must be one of the values in ("exact_limit", "eol", "word_sep", "auto")
+    :param unique_first_part:
+        Whether the first part should have a different length or not.
+        Useful for editing media captions (with fewer limit of characters)
+    :param custom_first_part_length:
+        Custom length for the first part (default is FIRST_PART_LENGTH)
     :return:
         A list of strings - parts of the original text obtained by
         splitting big_text using the method, specified in split_mode
 
     All possible values of split_mode:
     * "exact_limit" - splits into parts of exactly CHARACTERS_LIMIT characters;
-    * "eol" - searches to the left of the assumed boundary at CHARACTERS_LIMIT for the nearest newline character '\n',
+    * "eol" - searches to the left of the assumed boundary at CHARACTERS_LIMIT for the nearest newline character,
         and splits at that point;
     * "word_sep" - searches to the left of the assumed boundary at CHARACTERS_LIMIT for
         the nearest word-separating character (one of the characters in WORD_SEPARATORS), and splits at that point;
@@ -45,19 +57,33 @@ def split(big_text: str, split_mode: str = "auto") -> list[str]:
         splits that part as "exact_limit".
     """
     if split_mode not in SPLIT_MODES:  # check for incorrect split_mode value
-        raise ValueError("split_mode must be one of the values in SPLIT_MODES!")
+        raise ValueError('split_mode must be one of the values in ("exact_limit", "eol", "word_sep", "auto")!')
     if big_text == "":
         raise ValueError("Message text can't be empty!")
+    if custom_first_part_length <= 0 or custom_first_part_length > CHARACTERS_LIMIT:
+        raise ValueError("custom_first_part_length must be 0< <= CHARACTERS_LIMIT")
+
     parts = []
     if split_mode == "exact_limit":
-        # dividing into parts of exactly CHARACTERS_LIMIT characters
-        parts = [big_text[i:i + CHARACTERS_LIMIT] for i in range(0, len(big_text), CHARACTERS_LIMIT)]
+        if unique_first_part:
+            parts.append(big_text[0:custom_first_part_length])  # adding unique first part
+            minimum = custom_first_part_length
+        else:
+            minimum = 0
+        # dividing the rest into parts of exactly CHARACTERS_LIMIT characters
+        parts += [big_text[i:i + CHARACTERS_LIMIT] for i in range(minimum, len(big_text), CHARACTERS_LIMIT)]
         return parts
     while big_text != "":  # while there are some parts left
-        if len(big_text) <= CHARACTERS_LIMIT:  # if it is the last part
+        is_last_part = len(big_text) <= CHARACTERS_LIMIT or \
+                       (len(big_text) <= custom_first_part_length and len(parts) == 0 and unique_first_part)
+        if is_last_part:  # if it is the last part
             parts.append(big_text)
             break
-        for current_char in range(min(CHARACTERS_LIMIT - 1, len(big_text)), 0, -1):
+        maximum = \
+            min(custom_first_part_length-1, len(big_text)) \
+            if len(parts) == 0 and unique_first_part \
+            else min(CHARACTERS_LIMIT - 1, len(big_text))
+        for current_char in range(maximum, 0, -1):
             # searching to the left for newline or word separator
             if split_mode in ("eol", "auto") and big_text[current_char] == "\n":
                 parts.append(big_text[0:current_char + 1])  # adding part, that ends on current_char
@@ -67,17 +93,28 @@ def split(big_text: str, split_mode: str = "auto") -> list[str]:
                 parts.append(big_text[0:current_char + 1])  # adding part, that ends on current_char
                 big_text = big_text[current_char + 1:]  # subtracting that part from all text
                 break
-
-            is_nothing_found = \
-                (split_mode == "auto" and
-                 current_char == CHARACTERS_LIMIT - 1 - AUTO_SPLIT_MAX_CHARACTERS) \
-                or current_char == CHARACTERS_LIMIT // 2
+            if unique_first_part and len(parts) == 0:
+                is_nothing_found = \
+                    (split_mode == "auto" and
+                     current_char == custom_first_part_length - 1 - AUTO_SPLIT_MAX_CHARACTERS) \
+                    or current_char == custom_first_part_length // 2
+            else:
+                is_nothing_found = \
+                    (split_mode == "auto" and
+                     current_char == CHARACTERS_LIMIT - 1 - AUTO_SPLIT_MAX_CHARACTERS) \
+                    or current_char == CHARACTERS_LIMIT // 2
             if is_nothing_found:
                 # if auto mode searched through AUTO_SPLIT_MAX_CHARACTERS characters, or eol/word_sep mode searched
                 # through half of the part, and nothing found,
-                parts.append(big_text[0:CHARACTERS_LIMIT])  # adding part with length CHARACTERS_LIMIT
-                big_text = big_text[CHARACTERS_LIMIT:]  # subtracting that part from all text
-                break
+                if unique_first_part and len(parts) == 0:
+                    parts.append(big_text[0:custom_first_part_length])
+                    # adding part with length custom_first_part_length
+                    big_text = big_text[custom_first_part_length:]  # subtracting that part from all text
+                    break
+                else:
+                    parts.append(big_text[0:CHARACTERS_LIMIT])  # adding part with length CHARACTERS_LIMIT
+                    big_text = big_text[CHARACTERS_LIMIT:]  # subtracting that part from all text
+                    break
     return parts
 
 
@@ -85,6 +122,8 @@ def safe_send(
         chat_id: Union[int, str],
         text: str,
         split_mode: Optional[str] = "auto",
+        unique_first_part: bool = False,
+        custom_first_part_length: int = MEDIA_CAPTION_LENGTH,
         parse_mode: Optional["enums.ParseMode"] = None,
         entities: List["types.MessageEntity"] = None,
         disable_web_page_preview: bool = None,
@@ -101,7 +140,7 @@ def safe_send(
 ):
     """
     Send text messages of any length by splitting them into blocks of CHARACTERS_LIMIT characters,
-    handle FloodWait errors.
+    handle Flood errors.
 
     :param chat_id:
         Unique identifier (int) or username (str) of the target chat.
@@ -112,6 +151,11 @@ def safe_send(
     :param split_mode:
         The mode of splitting the text;
         must be one of the values in ("exact_limit", "eol", "word_sep", "auto")
+    :param unique_first_part:
+        Whether the first part should have a different length or not.
+        Useful for editing media captions (with fewer limit of characters)
+    :param custom_first_part_length:
+        Custom length for the first part (default is FIRST_PART_LENGTH)
     :param parse_mode:
         By default, texts are parsed using both Markdown and HTML styles.
         You can combine both syntaxes together
@@ -134,7 +178,7 @@ def safe_send(
     :return:
         On success, the list of all sent text messages is returned.
     """
-    parts = split(text, split_mode)
+    parts = split(text, split_mode, unique_first_part, custom_first_part_length)
     result_messages = []
     for index, part in enumerate(parts):
         result = None
@@ -151,7 +195,7 @@ def safe_send(
                 protect_content,
                 reply_markup
             )
-        except FloodWait as FW:
+        except Flood as FW:
             asyncio.sleep(FW.value)
             result = app.send_message(
                 chat_id,
@@ -178,6 +222,8 @@ def safe_edit(
         message_id: int,
         text: str,
         split_mode: Optional[str] = "auto",
+        unique_first_part: bool = False,
+        custom_first_part_length: int = MEDIA_CAPTION_LENGTH,
         parse_mode: Optional["enums.ParseMode"] = None,
         entities: List["types.MessageEntity"] = None,
         disable_web_page_preview: bool = None,
@@ -185,7 +231,7 @@ def safe_edit(
 ):
     """
     Edit the message to text of any length by sending additional parts in separate messages.
-    If editing is not possible, send all parts as new messages. Handle FloodWait errors.
+    If editing is not possible, send all parts as new messages. Handle Flood errors.
 
     :param chat_id:
         Unique identifier (int) or username (str) of the target chat.
@@ -198,6 +244,15 @@ def safe_edit(
     :param split_mode:
         The mode of splitting the text;
         must be one of the values in ("exact_limit", "eol", "word_sep", "auto")
+    :param unique_first_part:
+        Whether the first part should have a different length or not.
+        Useful for editing media captions (with fewer limit of characters).
+        Automatically set to True when editing media caption
+    :param custom_first_part_length:
+        Custom length for the first part (default is FIRST_PART_LENGTH).
+        In case a value different from `FIRST_PART_LENGTH` is provided,
+        and the caption of a media message is being edited,
+        it is set to `min(custom_first_part_length, MEDIA_CAPTION_LENGTH)`
     :param parse_mode:
         By default, texts are parsed using both Markdown and HTML styles.
         You can combine both syntaxes together
@@ -211,7 +266,10 @@ def safe_edit(
     :return:
         On success, the list of edited message and all sent text messages is returned.
     """
-    parts = split(text, split_mode)
+    if app.get_messages(chat_id, message_id).caption:
+        unique_first_part = True
+        custom_first_part_length = min(custom_first_part_length, MEDIA_CAPTION_LENGTH)
+    parts = split(text, split_mode, unique_first_part, custom_first_part_length)
     result_messages = []
     first_result = None
     try:
@@ -224,7 +282,7 @@ def safe_edit(
             disable_web_page_preview,
             reply_markup
         )
-    except FloodWait as FW:
+    except Flood as FW:
         asyncio.sleep(FW.value)
         first_result = app.edit_message_text(
             chat_id,
@@ -284,7 +342,7 @@ def safe_edit(
             disable_web_page_preview,
             reply_markup
         )
-    except FloodWait as FW:
+    except Flood as FW:
         asyncio.sleep(FW.value)
         result = app.edit_message_text(
             chat_id,

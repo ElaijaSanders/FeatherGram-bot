@@ -148,7 +148,14 @@ def info(_, msg: types.Message):
     filters.user("me")
 )
 def json(_, msg: types.Message):
-    print(msg)
+    print(msg.reply_to_message)
+    safe_send(
+        msg.chat.id,
+        str(msg.reply_to_message),
+        split_mode='eol',
+        disable_notification=True,
+        reply_to_message_id=msg.reply_to_message.id
+    )
     msg.edit("Done!")
     sleep(5)
     msg.delete()
@@ -236,12 +243,14 @@ def test_edit(_, message: types.Message):
     result = safe_edit(
         message.chat.id,
         message.reply_to_message_id,
-        45*"a"
+        3*"a"+"."+15*"a"+"."+16*"a"+"."+"bbbbbbbbb",
+        "eol"
     )
     print(result)
+    message.delete()
+
 
 app.run()
-
 
 '''
 @app.on_disconnect()
