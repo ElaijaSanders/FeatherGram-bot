@@ -6,10 +6,10 @@ from typing import Union, List, Optional
 import asyncio
 from datetime import datetime
 
-CHARACTERS_LIMIT = 20  # max number of characters in one message
-AUTO_SPLIT_MAX_CHARACTERS = 5  # max number of characters searched through in split.auto mode
+CHARACTERS_LIMIT = 4096  # max number of characters in one message
+AUTO_SPLIT_MAX_CHARACTERS = 150  # max number of characters searched through in split.auto mode
 with app:
-    MEDIA_CAPTION_LENGTH = 10 if app.get_users("me").is_premium else 5
+    MEDIA_CAPTION_LENGTH = 2048 if app.get_users("me").is_premium else 1024
 SPLIT_MODES = (  # all possible values of split_mode parameter
     "exact_limit",  # Split into parts of exactly CHARACTERS_LIMIT characters
     "eol",  # Split at the nearest newline character to the limit

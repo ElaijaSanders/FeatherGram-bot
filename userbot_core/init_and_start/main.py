@@ -227,29 +227,6 @@ def a(_, msg: types.Message):
     safe_edit(msg.chat.id, msg.id, final_text)
 
 
-@app.on_message(
-    filters.command(
-        ['edit'],
-        prefixes=['.', ',', '/', '']
-    ) &
-    filters.user("me")
-)
-def test_edit(_, message: types.Message):
-    safe_edit(
-        message.chat.id,
-        message.id,
-        "editing..."
-    )
-    result = safe_edit(
-        message.chat.id,
-        message.reply_to_message_id,
-        3*"a"+"."+15*"a"+"."+16*"a"+"."+"bbbbbbbbb",
-        "eol"
-    )
-    print(result)
-    message.delete()
-
-
 app.run()
 
 '''
